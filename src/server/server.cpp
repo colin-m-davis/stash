@@ -1,162 +1,104 @@
+#include <cstdlib>
 #include <iostream>
-#include <boost/asio.hpp>
-#include <experimental/coroutine>
+#include <thread>
+#include <mutex>
 #include <utility>
-#include <unordered_set>
-#include <boost/asio/awaitable.hpp>
-#include <boost/asio/detached.hpp>
-#include <boost/asio/co_spawn.hpp>
-#include <boost/asio/io_context.hpp>
-#include <boost/asio/ip/tcp.hpp>
-#include <boost/asio/read_until.hpp>
-#include <boost/asio/redirect_error.hpp>
-#include <boost/asio/signal_set.hpp>
-#include <boost/asio/steady_timer.hpp>
-#include <boost/asio/use_awaitable.hpp>
-#include <boost/asio/write.hpp>
-#include "server.h"
+#include <boost/asio.hpp>
+#include <unordered_map>
+#include <string>
+#include <sstream>
+#include <optional>
+#include <query.hpp>
 
 using boost::asio::ip::tcp;
-using boost::asio::awaitable;
-using boost::asio::co_spawn;
-using boost::asio::detached;
-using boost::asio::redirect_error;
-using boost::asio::use_awaitable;
 
 
-void Stash::join(session_ptr session)
-{
-    sessions_.insert(session);
-}
+class Stash {
+public:
+    [[nodiscard]] std::optional<std::string> get(const std::string &key) {
+        std::lock_guard<std::mutex> guard(storage_mutex);
+        auto found = storage.find(key);
+        if (found == storage.cend()) {
+            return {};
+        }
+        return found->second;
+    }
 
-void Stash::leave(session_ptr session)
-{
-    sessions_.erase(session);
-}
+    void put(const std::string &key, const std::string &val) {
+        std::lock_guard<std::mutex> guard(storage_mutex);
+        storage[key] = val;
+    }
 
-void Stash::deliver(const std::string &msg) {
-    std::cout << msg << '\n';
-}
+private:
+    std::unordered_map<std::string, std::string> storage;
+    std::mutex storage_mutex;
+};
 
 
-Session::Session(tcp::socket socket, Stash &stash)
-    :   socket_(std::move(socket)),
-        timer_(socket_.get_executor()),
-        stash_(stash)
-{
-    timer_.expires_at(std::chrono::steady_clock::time_point::max());
-}
-
-void Session::start()
-{
-    stash_.join(shared_from_this());
-
-    co_spawn(
-        socket_.get_executor(),
-        [self = shared_from_this()]{ return self->reader(); },
-        detached
-    );
-
-    co_spawn(
-        socket_.get_executor(),
-        [self = shared_from_this()]{ return self->writer(); },
-        detached
-    );
-}
-
-awaitable<void> Session::reader()
-{
-    try
-    {
-        for (std::string read_msg;;) {
-            std::size_t n = co_await boost::asio::async_read_until(
-                socket_,
-                boost::asio::dynamic_buffer(read_msg, 1024), "\n", use_awaitable
-            );
-            stash_.deliver(read_msg.substr(0, n));
-            read_msg.erase(0, n);
+class Server {
+public:
+    Server(boost::asio::io_context &io_context, unsigned short port) {
+        tcp::acceptor acceptor(io_context, tcp::endpoint(tcp::v4(), port));
+        while (true) {
+            std::thread(&Server::session, this, acceptor.accept()).detach();
         }
     }
-    catch(const std::exception& e)
-    {
-        stop();
-    }
-}
 
-awaitable<void> Session::writer()
-{
-    try
-    {
-        while (socket_.is_open())
-        {
-            if (write_msgs_.empty())
-            {
-                boost::system::error_code ec;
-                co_await timer_.async_wait(redirect_error(use_awaitable, ec));
+private:
+    Stash stash{};
+    void session(tcp::socket sock) {
+        try {
+            while (true) {
+                char query_buff[Query::MAX_LENGTH];
+
+                boost::system::error_code error;
+                sock.read_some(boost::asio::buffer(query_buff), error);
+
+                if (error == boost::asio::error::eof) {
+                    break;
+                } else if (error) {
+                    throw boost::system::system_error(error);
+                }
+                
+                // TODO: data validation and scalability in command types
+                std::istringstream query_iss(query_buff);
+                std::string operation;
+                query_iss >> operation;
+
+                std::string key;
+                query_iss >> key;
+
+                std::string result_str = "stash: ";
+                if (operation == "get") {
+                    result_str += stash.get(key).value_or("error: key not in stash");
+                } else if (operation == "put") {
+                    std::string val;
+                    query_iss >> val;
+                    stash.put(key, val);
+                    result_str += "put success";
+                }
+
+                boost::asio::write(sock, boost::asio::buffer(result_str.data(), result_str.length()));
             }
-            else
-            {
-                co_await boost::asio::async_write(
-                    socket_,
-                    boost::asio::buffer(write_msgs_.front()),
-                    use_awaitable
-                );
-                write_msgs_.pop();
-            }
+        } catch (std::exception &e) {
+            std::cerr << "exception in thread: " << e.what() << '\n';
         }
     }
-    catch(const std::exception& e)
-    {
-        stop();
-    }
-    
-}
+};
 
-void Session::stop()
-{
-    stash_.leave(shared_from_this());
-    socket_.close();
-    timer_.cancel();
-}
 
-awaitable<void> listener(tcp::acceptor acceptor)
-{
-    Stash stash;
-
-    for (;;)
-    {
-        std::make_shared<Session>(
-            co_await acceptor.async_accept(use_awaitable),
-            stash
-        )->start();
-    }
-}
-
-int main(int argc, char* argv[]){
-    try
-    {
-        if (argc < 2)
-        {
-            std::cerr << "Usage: stash_server <port> [<port> ...]\n";
+int main(int argc, char* argv[]) {
+    try {
+        if (argc != 2) {
+            std::cerr << "usage: stashserver <port>\n";
             return 1;
         }
-        boost::asio::io_context io_context(1);
 
-        for (int i = 1; i < argc; ++i) {
-            unsigned short port = std::atoi(argv[i]);
-            co_spawn(io_context,
-            listener(tcp::acceptor(io_context, {tcp::v4(), port})),
-            detached);
-        }
+        boost::asio::io_context io_context;
 
-        boost::asio::signal_set signals(io_context, SIGINT, SIGTERM);
-        signals.async_wait([&](auto, auto){io_context.stop(); });
-
-        io_context.run();
+        Server(io_context, std::atoi(argv[1]));
     }
-    catch (std::exception &e) {
-        std::cerr << "Exception: " << e.what() << '\n';
+    catch(const std::exception& e) {
+        std::cerr << e.what() << '\n';
     }
-
-    return 0;
 }

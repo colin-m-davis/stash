@@ -1,3 +1,5 @@
+#pragma once
+
 #include <iostream>
 #include <boost/asio.hpp>
 #include <experimental/coroutine>
@@ -16,8 +18,6 @@
 #include <boost/asio/use_awaitable.hpp>
 #include <boost/asio/write.hpp>
 
-#pragma once
-
 using boost::asio::ip::tcp;
 using boost::asio::awaitable;
 using boost::asio::co_spawn;
@@ -25,15 +25,16 @@ using boost::asio::detached;
 using boost::asio::redirect_error;
 using boost::asio::use_awaitable;
 
+
 class Stash;
 
-class Session
-    :   public std::enable_shared_from_this<Session>
+class Session : public std::enable_shared_from_this<Session>
 {
 public:
     Session(tcp::socket socket, Stash &stash);
     
     void start();
+    ~Session();
 
 private:
     awaitable<void> reader();
@@ -47,6 +48,7 @@ private:
     Stash &stash_;
     std::queue<std::string> write_msgs_;
 };
+
 
 class Stash {
     typedef std::shared_ptr<Session> session_ptr;

@@ -1,54 +1,53 @@
+#include <cstdlib>
+#include <cstring>
 #include <iostream>
-#include <thread>
-#include <boost/bind.hpp>
 #include <boost/asio.hpp>
+#include <query.hpp>
+#include <response.hpp>
+#include <string>
 
 using boost::asio::ip::tcp;
 
 
-// class Client {
-// public:
-//     Client(
-//         boost::asio::io_context& io_context,
-//         const tcp::resolver::results_type& endpoints)
-//     :   io_context_(io_context),
-//         socket_(io_context)
-//     {
-//         boost::asio::async_connect(socket_, endpoints,
-//             boost::bind(&Client::handle_connect, this,
-//             boost::asio::placeholders::error)
-//         );
-//     }
-
-// private:
-//     void handle_connect(const boost::system::error_code& error) {
-//         if (!error) {
-//         }
-//     }
-//     boost::asio::io_context& io_context_;
-//     tcp::socket socket_;
-// };
-
 int main(int argc, char* argv[]) {
-    try
-    {
+    try {
         if (argc != 3) {
-            std::cerr << "Usage: client <host> <port>\n";
+            std::cerr << "usage: stashclient <host> <port>\n";
             return 1;
         }
 
         boost::asio::io_context io_context;
-
+        
+        tcp::socket sock(io_context);
         tcp::resolver resolver(io_context);
-        tcp::resolver::results_type endpoints = resolver.resolve(argv[1], argv[2]);
+        char *host = argv[1];
+        char *port = argv[2];
+        boost::asio::connect(sock, resolver.resolve(host, port));
+        
+        std::cout << "connected. enter query: ";
+        char query_buff[Query::MAX_LENGTH];
+        std::cin.getline(query_buff, Query::MAX_LENGTH);
+        std::size_t query_length = std::strlen(query_buff);
+        boost::asio::write(
+            sock,
+            boost::asio::buffer(query_buff, query_length
+        ));
 
-        std::thread t([&io_context]{ io_context.run(); });
+        char response_buff[Response::MAX_LENGTH];
+        boost::system::error_code error;
+        std::size_t response_length = sock.read_some(boost::asio::buffer(response_buff), error);
 
-        t.join();
+        if (error == boost::asio::error::eof) {
+            std::cerr << "unexpected EOF, exiting\n";
+            return 1;
+        } else if (error) {
+            throw boost::system::system_error(error);
+        }
+
+        response_buff[response_length] = '\0';
+        std::cout << "response received from server:\n" << response_buff << '\n';
     }
-    catch(std::exception &e)
-    {
-        std::cerr << "Exception: " << e.what() << '\n';
+    catch (std::exception &e) {
+        std::cerr << "exception: " << e.what() << '\n';
     }
-    return 0;
 }
