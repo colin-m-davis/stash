@@ -24,7 +24,8 @@ int main(int argc, char* argv[]) {
         char *port = argv[2];
         boost::asio::connect(sock, resolver.resolve(host, port));
         
-        std::cout << "connected. enter query: ";
+        std::cout << "connected.\n";
+        std::cout << "enter query: ";
         char query_buff[Query::MAX_LENGTH];
         std::cin.getline(query_buff, Query::MAX_LENGTH);
         std::size_t query_length = std::strlen(query_buff);
@@ -45,7 +46,7 @@ int main(int argc, char* argv[]) {
         }
 
         response_buff[response_length] = '\0';
-        std::cout << "response received from server:\n" << response_buff << '\n';
+        std::cout << "response received:\n" << response_buff << '\n';
     }
     catch (std::exception &e) {
         std::cerr << "exception: " << e.what() << '\n';
