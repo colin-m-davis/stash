@@ -24,7 +24,6 @@ public:
                 0, [prime](const char a, const char b){ return (a + b) % prime; }
             ) % FILTER_SIZE;
             if (bloom_filter[bloom_hash] == false) {
-                std::cerr << "bloom filter says it's not here\n";
                 return {};
             }
         }
