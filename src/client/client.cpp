@@ -31,7 +31,8 @@ int main(int argc, char* argv[]) {
             std::cin.getline(query_buff, Query::MAX_LENGTH);
             std::size_t query_length = std::strlen(query_buff);
 
-            if (strcmp(query_buff, "exit") == 0) {
+            if (query_length == 4 && std::strcmp(query_buff, "exit") == 0) {
+                std::cout << "bye :)\n";
                 return 0;
             }
 
