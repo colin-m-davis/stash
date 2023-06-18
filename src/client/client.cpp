@@ -30,6 +30,11 @@ int main(int argc, char* argv[]) {
             char query_buff[Query::MAX_LENGTH];
             std::cin.getline(query_buff, Query::MAX_LENGTH);
             std::size_t query_length = std::strlen(query_buff);
+
+            if (strcmp(query_buff, "exit") == 0) {
+                return 0;
+            }
+
             boost::asio::write(
                 sock,
                 boost::asio::buffer(query_buff, query_length
