@@ -12,7 +12,6 @@ set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_RUNTIME OFF)
 find_package(Boost REQUIRED)
 
-
 add_executable(stashserver src/server/server.cpp)
 add_executable(stashclient src/client/client.cpp)
 

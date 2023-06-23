@@ -25,12 +25,16 @@ int main(int argc, char* argv[]) {
         boost::asio::connect(sock, resolver.resolve(host, port));
         
         std::cout << "connected.\n";
+
         while (true) {
             std::cout << "enter query:\n> ";
             char query_buff[Query::MAX_LENGTH];
             std::cin.getline(query_buff, Query::MAX_LENGTH);
             std::size_t query_length = std::strlen(query_buff);
 
+            if (query_length == 0) {
+                continue;
+            }
             if (query_length == 4 && std::strcmp(query_buff, "exit") == 0) {
                 std::cout << "bye :)\n";
                 return 0;
@@ -40,6 +44,10 @@ int main(int argc, char* argv[]) {
                 sock,
                 boost::asio::buffer(query_buff, query_length
             ));
+
+            for (std::size_t i = 0; i <= query_length; ++i) {
+                query_buff[i] = '\0';
+            }
 
             char response_buff[Response::MAX_LENGTH];
             boost::system::error_code error;
@@ -54,6 +62,7 @@ int main(int argc, char* argv[]) {
 
             response_buff[response_length] = '\0';
             std::cout << response_buff << '\n';
+            
         }
     }
     catch (std::exception &e) {
