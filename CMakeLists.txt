@@ -13,15 +13,15 @@ set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_RUNTIME OFF)
 find_package(Boost REQUIRED)
 
-add_executable(stashserver src/server/server.cpp)
-target_include_directories(stashserver PRIVATE include Boost::boost) 
-target_link_libraries(stashserver PRIVATE Boost::boost)
-target_compile_options(stashserver PRIVATE -Wall -Werror -Wextra -Wshadow -Wnon-virtual-dtor -Wpedantic -Wunused)
 
+add_executable(stashserver src/server/server.cpp)
 add_executable(stashclient src/client/client.cpp)
-target_include_directories(stashclient PRIVATE include Boost::boost)
-target_link_libraries(stashclient PRIVATE Boost::boost)
-target_compile_options(stashclient PRIVATE -Wall -Werror -Wextra -Wshadow -Wnon-virtual-dtor -Wpedantic -Wunused)
+
+foreach(target stashclient stashserver)
+    target_include_directories(${target} PRIVATE include Boost::boost)
+    target_link_libraries(${target} PRIVATE Boost::boost)
+    target_compile_options(${target} PRIVATE -Wall -Werror -Wextra -Wshadow -Wnon-virtual-dtor -Wpedantic -Wunused)
+endforeach()
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
