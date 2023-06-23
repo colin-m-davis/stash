@@ -91,19 +91,24 @@ private:
                 std::string key;
                 query_iss >> key;
 
-                std::string result_str;
+                std::string result_str = "<response> ";
                 if (operation == "get") {
-                    result_str = stash.get(key).value_or("error: key not in stash");
+                    result_str += stash.get(key).value_or("error: key not in stash");
                 } else if (operation == "put") {
                     std::string val;
                     query_iss >> val;
                     stash.put(key, val);
-                    result_str = "put success";
+                    result_str += "put success";
                 } else {
-                    result_str = "error: unknown command " + operation + '\n';
+                    result_str += "error: unknown command " + operation;
                 }
-
+                result_str += '\n';
                 boost::asio::write(sock, boost::asio::buffer(result_str.data(), result_str.length()));
+
+                std::size_t query_size = strlen(query_buff);
+                for (std::size_t i = 0; i <= query_size; ++i) {
+                    query_buff[i] = '\0';
+                }
             }
         } catch (std::exception &e) {
             std::cerr << "exception in thread: " << e.what() << '\n';
