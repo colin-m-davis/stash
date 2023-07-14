@@ -10,6 +10,7 @@
 #include <optional>
 #include <numeric>
 #include <query.hpp>
+#include <iostream>
 
 using boost::asio::ip::tcp;
 
@@ -125,7 +126,7 @@ int main(int argc, char* argv[]) {
         }
 
         boost::asio::io_context io_context;
-
+        std::cout << "Running server on port " << std::atoi(argv[1]) << '\n';        
         Server(io_context, std::atoi(argv[1]));
     }
     catch(const std::exception& e) {
