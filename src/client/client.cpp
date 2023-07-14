@@ -29,7 +29,7 @@ int main(int argc, char* argv[]) {
         while (true) {
             std::cout << "enter query:\n> ";
             char query_buff[Query::MAX_LENGTH];
-            std::cin.getline(query_buff, Query::MAX_LENGTH);
+            std::cin.getline(query_buff, Query::MAX_LENGTH-1);
             std::size_t query_length = std::strlen(query_buff);
 
             if (query_length == 0) {
